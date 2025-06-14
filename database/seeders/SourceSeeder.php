@@ -21,7 +21,14 @@ class SourceSeeder extends Seeder
                 'url' => 'https://www.sana.sy/?feed=rss2',
                 'created_at' => Carbon::now(),
                 'updated_at' => Carbon::now(),
-            ]];
+            ],
+            [
+                'name' => 'Enab Baladi',
+                'url' => 'https://www.enabbaladi.net/feed',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ]
+        ];
 
             foreach ($sources as $source) {
                 Source::create($source);

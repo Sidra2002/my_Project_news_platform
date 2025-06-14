@@ -13,136 +13,158 @@ use Illuminate\Http\Request;
 
 class SourceNewsController extends Controller
 {
+    private static $classificationKeywords = null;
+    private $defaultCategoryId = 13;
+
     public function fetchFromRss()
-{
-    $sources = Source::all();
+    {
+        Log::info("🚀 بدء تنفيذ عملية جلب الأخبار من جميع المصادر...");
 
-    foreach ($sources as $source) {
-        try {
-            // قراءة ملف RSS باستخدام SimpleXML
-            $rss = simplexml_load_file($source->url);
+        $sources = Source::all();
 
-            if (!$rss || !isset($rss->channel->item)) {
-                Log::warning("الرابط لا يحتوي على عناصر خبر", ['source' => $source->url]);
-                continue;
-            }
+        foreach ($sources as $source) {
+            Log::info("🔎 معالجة المصدر: {$source->url}");
 
-            foreach ($rss->channel->item as $item) {
-                $title = (string) $item->title;
-                $content = (string) $item->description;
-                $publishedAt = isset($item->pubDate) ? Carbon::parse($item->pubDate)->toDateTimeString() : Carbon::now();
+            try {
+                $rss = simplexml_load_file($source->url);
 
-                $categoryId = $this->detectCategory($title);
-                
-if ($categoryId === null) {
-    Log::warning("لم يتم تصنيف الخبر: $title");
-    continue;
-}
+                if (!$rss || !isset($rss->channel->item)) {
+                    Log::warning("❌ الرابط لا يحتوي على عناصر خبر", ['source' => $source->url]);
+                    continue;
+                }
 
-                // محاولة استخراج صورة (لو موجودة داخل content)
-                preg_match('/<img.*?src=["\'](.*?)["\']/', $content, $matches);
-                $imageUrl = $matches[1] ?? null;
-
-                $imageFileName = 'default.png';
-
-                if ($imageUrl) {
+                foreach ($rss->channel->item as $item) {
+                    $title = (string) $item->title;
+                    $description = (string) $item->description;
+                    echo "  start  ";
                     try {
-                        $imageContents = file_get_contents($imageUrl);
-                        $ext = pathinfo(parse_url($imageUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'png';
-                        $imageFileName = Str::uuid() . '.' . $ext;
+                        $content = $item->children('http://purl.org/rss/1.0/modules/content/')->encoded;
+                        echo "good";
+                    } catch (Exception $e) {
+                        echo "false";
+                        $content = "";
+                    }
+                    echo "  end  ";
+                    $publishedAt = isset($item->pubDate) ? Carbon::parse($item->pubDate)->toDateTimeString() : Carbon::now();
 
-                        \Illuminate\Support\Facades\File::ensureDirectoryExists(public_path('static/images'));
-                        file_put_contents(public_path('static/images/' . $imageFileName), $imageContents);
-                    } catch (\Exception $e) {
-                        Log::warning("فشل تحميل الصورة: $imageUrl");
-                        $imageFileName = 'default.png';
+                    $categoryId = $this->detectCategory($title);
+
+                    if ($categoryId === null) {
+                        echo "  sec if  ";
+                        Log::warning("لم يتم تصنيف الخبر: $title");
+                        continue;
+                    }
+
+
+                    // استخراج التصنيف
+                    $categoryId = $this->detectCategory($title . ' ' . $description . ' ' . $content);
+                    Log::info("🏷️ التصنيف المحدد: $categoryId");
+                    
+                    // محاولة استخراج صورة (لو موجودة داخل content)
+                    preg_match('/<img.*?src=["\'](.*?)["\']/', $content, $matches);
+                    $imageUrl = $matches[1] ?? null;
+
+                    $imageFileName = null;
+
+                    if ($imageUrl) {
+                        echo "  img yes  ";
+                        try {
+                            echo "  img try  ";
+                            $imageContents = file_get_contents($imageUrl);
+                            $ext = pathinfo(parse_url($imageUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'png';
+                            $imageFileName = Str::uuid() . '.' . $ext;
+                            \Illuminate\Support\Facades\File::ensureDirectoryExists(public_path('static/images'));
+                            file_put_contents(public_path('static/images/' . $imageFileName), $imageContents);
+                        } catch (\Exception $e) {
+                            echo " img catch  ";
+                            Log::warning("فشل تحميل الصورة: $imageUrl");
+                            $imageFileName = null;
+                        }
+                    }
+
+                    // تخزين الخبر إذا لم يكن موجود مسبقاً
+                    if (!SourceNews::where('title', $title)->exists()) {
+                        echo $imageFileName;
+                        SourceNews::create([
+                            'title' => $title,
+                            'content' => strip_tags($description),
+                            'category_id' => $categoryId,
+                            'source_id' => $source->id,
+                            'img_url' => $imageFileName,
+                            'created_at' => $publishedAt,
+                            'updated_at' => Carbon::now(),
+                        ]);
+
+                        Log::info("تمت إضافة خبر جديد", ['title' => $title]);
                     }
                 }
-
-                // تخزين الخبر إذا لم يكن موجود مسبقاً
-                if (!SourceNews::where('title', $title)->exists()) {
-                    SourceNews::create([
-                        'title' => $title,
-                        'content' => strip_tags($content),
-                        'category_id' => $categoryId,
-                        'source_id' => $source->id,
-                        'img_url' => $imageFileName,
-                        'created_at' => $publishedAt,
-                        'updated_at' => Carbon::now(),
-                    ]);
-
-                    Log::info("تمت إضافة خبر جديد", ['title' => $title]);
-                }
+            } catch (\Exception $e) {
+                Log::error("فشل تحميل أو معالجة RSS من المصدر: {$source->url}", ['error' => $e->getMessage()]);
             }
-
-        } catch (\Exception $e) {
-            Log::error("فشل تحميل أو معالجة RSS من المصدر: {$source->url}", ['error' => $e->getMessage()]);
         }
+
+        return response()->json(['message' => 'تم جلب الأخبار بنجاح']);
     }
 
-    return response()->json(['message' => 'تم جلب الأخبار بنجاح']);
-}
 
-         private function detectCategory($title)
+
+    private function detectCategory($text)
     {
-        $keywords = [
-        'Politics' => [
-            'رئيس', 'رئاسة', 'برلمان', 'مجلس', 'وزير', 'وزارة', 'حكومة', 'سياسة', 'سياسي', 'برلماني',
-            'انتخابات', 'تحالف', 'حزب', 'أحزاب', 'قانون', 'دستور', 'تصويت', 'سلطة', 'إصلاح', 'رئاسة الوزراء',
-            'المعارضة', 'السلطة', 'سيادي', 'قرارات', 'جلسة', 'تشريع', 'تشريعي', 'إقالة', 'تعديل وزاري', 'مبعوث',
-            'الخارجية', 'مفاوضات', 'اتفاق', 'معاهدة', 'أزمة سياسية'
-        ],
-            'Economy' => [
-            'اقتصاد', 'بنك', 'مصرف', 'الليرة', 'الدولار', 'الذهب', 'العملات', 'أسواق', 'بورصة', 'تضخم',
-            'ضرائب', 'موازنة', 'ميزانية', 'رواتب', 'سعر الصرف', 'دعم', 'استثمار', 'مشروع', 'الشركات', 'أرباح',
-            'خسائر', 'تجارة', 'صادرات', 'واردات', 'نمو', 'انكماش', 'ديون', 'سندات', 'تمويل', 'عجز',
-            'عقار', 'عقارات', 'الإنتاج', 'الصناعة'
-        ],
-             'Technology' => [
-            'تكنولوجيا', 'تقنية', 'ذكاء اصطناعي', 'إنترنت', 'شبكات', 'تطبيق', 'تطبيقات', 'برمجة', 'أندرويد', 'آيفون',
-            'حاسوب', 'كمبيوتر', 'روبوت', 'موبايل', 'هواتف', 'برمجيات', 'أمن سيبراني', 'الاختراق', 'تسريبات', 'تشفير',
-            'ألعاب إلكترونية', 'الواقع الافتراضي', 'ميتا', 'ميتافيرس', 'رقمي', 'كود', 'أبل', 'غوغل', 'سامسونغ', 'نظام تشغيل',
-            'ذكاء رقمي', 'خوارزمية', 'معالجة البيانات'
-        ],
-            'Health' => [
-            'صحة', 'مريض', 'مستشفى', 'مشفى', 'دواء', 'أدوية', 'لقاح', 'تطعيم', 'علاج', 'عناية',
-            'فيروس', 'كورونا', 'أوبئة', 'انفلونزا', 'أعراض', 'تشخيص', 'تحاليل', 'طبيب', 'عيادة', 'مرض',
-            'إصابات', 'إصابة', 'وفيات', 'وفاة', 'نقل دم', 'كوفيد', 'جرعة', 'ضغط', 'سكري', 'حرارة',
-            'جلطة', 'غرق', 'حادث'
-        ],
-            'Sports' => [
-            'رياضة', 'كرة قدم', 'كرة سلة', 'لاعب', 'منتخب', 'مباراة', 'بطولة', 'كأس', 'أهداف', 'ملعب',
-            'شوط', 'فوز', 'خسارة', 'تعادل', 'تصفيات', 'مدرب', 'النتيجة', 'الدوري', 'ترتيب', 'نقطة',
-            'جولة', 'نادي', 'تحكيم', 'ركلة جزاء', 'اللاعبون', 'هزيمة', 'أداء', 'إصابة رياضية', 'سباق', 'ألعاب قوى',
-            'مونديال', 'الأولمبياد'
-        ],
-        ];
-         $title = Str::lower(trim($title));
+        if (self::$classificationKeywords === null) {
+            self::$classificationKeywords = $this->loadClassificationKeywords();
+        }
 
-        foreach ($keywords as $category => $words) {
-            foreach ($words as $word) {
-                if (Str::contains($title, $word)) {
-                    $cat = Category::where('name', $category)->first();
-                    return $cat ? $cat->id : null;
+        $keywordsMapping = self::$classificationKeywords;
+
+        if (!is_array($keywordsMapping)) {
+            Log::warning("🚨 ملف التصنيف غير صالح أو فارغ، سيتم استخدام التصنيف العام.");
+            return $this->defaultCategoryId;
+        }
+
+        $matchedCategoryName = null;
+
+        foreach ($keywordsMapping as $categoryName => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (mb_stripos($text, $keyword) !== false) {
+                    $matchedCategoryName = $categoryName;
+                    break 2;
                 }
             }
         }
-        
-        // تصنيف افتراضي: Uncategorized
-        $defaultCategory = Category::firstOrCreate(
-            ['name' => 'Uncategorized'],
-            ['created_at' => now(), 'updated_at' => now()]
-        );
 
-        return $defaultCategory->id;
-           
+        if ($matchedCategoryName) {
+            $category = Category::where('name', $matchedCategoryName)->first();
+            if ($category) {
+                return $category->id;
+            }
+        }
+
+        return $this->defaultCategoryId;
     }
-        
+
+    private function loadClassificationKeywords()
+    {
+        $filePath = storage_path('app/classification_keyword.json');
+
+        if (!file_exists($filePath)) {
+            Log::warning("❌ ملف التصنيف غير موجود: {$filePath}");
+            return null;
+        }
+
+        try {
+            $json = file_get_contents($filePath);
+            $data = json_decode($json, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::error("❌ خطأ في تنسيق JSON: " . json_last_error_msg());
+                return null;
+            }
+
+            Log::info("📁 تم تحميل ملف التصنيف بنجاح.");
+            return $data;
+        } catch (\Exception $e) {
+            Log::error("❌ فشل في قراءة ملف التصنيف", ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
 }
-    
-      
-    
-
-   
-
-

@@ -5,7 +5,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminNewsController;
 use App\Http\Controllers\SourceNewsController;
-
+use App\Http\Controllers\NewsReactionController;
+use App\Http\Controllers\UserRecomandationsController;
+use App\Http\Controllers\UserProfileController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -25,4 +27,21 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/admin-news', [AdminNewsController::class, 'store']);
 
 //SourceNews
-Route::get('/test-fetch-news', [SourceNewsController::class, 'fetchFromRss']);
+Route::get('/fetch-news', [SourceNewsController::class, 'fetchFromRss']);
+
+//Reactions
+Route::middleware('auth:sanctum')->post('/news/{id}/react', [NewsReactionController::class, 'react']);
+
+//Get categories
+Route::get('/categories', [\App\Http\Controllers\CategoryController::class, 'index']);
+
+
+//Save prefrencess
+Route::middleware('auth:sanctum')->post('/user/preferences', [UserRecomandationsController::class, 'store']);
+
+//view personal info
+Route::middleware('auth:sanctum')->get('/user/profile', [\App\Http\Controllers\UserProfileController::class, 'show']);
+
+
+//Edite personal info
+Route::middleware('auth:sanctum')->put('/user/profile', [\App\Http\Controllers\UserProfileController::class, 'update']);

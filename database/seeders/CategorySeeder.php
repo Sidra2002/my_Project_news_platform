@@ -15,7 +15,14 @@ class CategorySeeder extends Seeder
             'Technology',
             'Health',
            'Sports',
-           'Various_internatonal_news',
+           'Environment',
+           'Culture & Arts',
+           'Education',
+           'Tourism',
+           'Crime & Law',
+           'Lifestyle',
+           'Science',
+           'General',
         ];
 
         foreach ($categories as $name) {

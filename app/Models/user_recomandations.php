@@ -17,12 +17,16 @@ class user_recomandations extends Model
     // Relationships
 
     public function category()
-    {
-        return $this->belongsTo(Category::class);
-    }
+{
+    return $this->belongsTo(\App\Models\Category::class);
+}
+
 
     public function user()
     {
         return $this->belongsTo(User::class);
     }
+
+    
+    
 }

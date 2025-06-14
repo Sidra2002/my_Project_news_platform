@@ -47,4 +47,10 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function preferences()
+{
+    return $this->hasMany(\App\Models\user_recomandations::class);
+}
+
 }
