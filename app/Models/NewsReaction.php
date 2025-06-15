@@ -18,4 +18,12 @@ class NewsReaction extends Model
     {
         return $this->belongsTo(SourceNews::class, 'news_id');
     }
+    public function getReactionLabelAttribute()
+    {
+        return match ($this->reaction_type) {
+            1 => 'like',
+            -1 => 'dislike',
+            default => 'unknown',
+        };
+    }
 }

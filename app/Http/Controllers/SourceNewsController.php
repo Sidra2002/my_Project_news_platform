@@ -18,18 +18,18 @@ class SourceNewsController extends Controller
 
     public function fetchFromRss()
     {
-        Log::info("🚀 بدء تنفيذ عملية جلب الأخبار من جميع المصادر...");
+        Log::info("عملية جلب الأخبار ");
 
         $sources = Source::all();
 
         foreach ($sources as $source) {
-            Log::info("🔎 معالجة المصدر: {$source->url}");
+            Log::info(" معالجة المصدر: {$source->url}");
 
             try {
                 $rss = simplexml_load_file($source->url);
 
                 if (!$rss || !isset($rss->channel->item)) {
-                    Log::warning("❌ الرابط لا يحتوي على عناصر خبر", ['source' => $source->url]);
+                    Log::warning(" الرابط لا يحتوي على  خبر", ['source' => $source->url]);
                     continue;
                 }
 
@@ -58,7 +58,7 @@ class SourceNewsController extends Controller
 
                     // استخراج التصنيف
                     $categoryId = $this->detectCategory($title . ' ' . $description . ' ' . $content);
-                    Log::info("🏷️ التصنيف المحدد: $categoryId");
+                    Log::info("تحديد التصنيف   $categoryId");
                     
                     // محاولة استخراج صورة (لو موجودة داخل content)
                     preg_match('/<img.*?src=["\'](.*?)["\']/', $content, $matches);
@@ -95,11 +95,11 @@ class SourceNewsController extends Controller
                             'updated_at' => Carbon::now(),
                         ]);
 
-                        Log::info("تمت إضافة خبر جديد", ['title' => $title]);
+                        Log::info("انضاف الخبر", ['title' => $title]);
                     }
                 }
             } catch (\Exception $e) {
-                Log::error("فشل تحميل أو معالجة RSS من المصدر: {$source->url}", ['error' => $e->getMessage()]);
+                Log::error("فشل تحميل  : {$source->url}", ['error' => $e->getMessage()]);
             }
         }
 
@@ -117,7 +117,7 @@ class SourceNewsController extends Controller
     $keywordsMapping = self::$classificationKeywords;
 
     if (!is_array($keywordsMapping)) {
-        Log::warning("🚨 ملف التصنيف غير صالح أو فارغ، سيتم استخدام التصنيف العام.");
+        Log::warning(" ملف التصنيف غير صالح أو فارغ، سيتم استخدام التصنيف العام.");
         return $this->defaultCategoryId;
     }
 
@@ -155,7 +155,7 @@ class SourceNewsController extends Controller
         $filePath = storage_path('app/classification_keyword.json');
 
         if (!file_exists($filePath)) {
-            Log::warning("❌ ملف التصنيف غير موجود: {$filePath}");
+            Log::warning(" ملف التصنيف غير موجود: {$filePath}");
             return null;
         }
 
@@ -164,16 +164,25 @@ class SourceNewsController extends Controller
             $data = json_decode($json, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                Log::error("❌ خطأ في تنسيق JSON: " . json_last_error_msg());
+                Log::error(" خطأ في تنسيق JSON: " . json_last_error_msg());
                 return null;
             }
 
-            Log::info("\ud83d\udcc1 تم تحميل ملف التصنيف بنجاح.");
+            Log::info(" تم تحميل ملف التصنيف بنجاح.");
             return $data;
         } catch (\Exception $e) {
-            Log::error("❌ فشل في قراءة ملف التصنيف", ['error' => $e->getMessage()]);
+            Log::error(" فشل في قراءة ملف التصنيف", ['error' => $e->getMessage()]);
             return null;
         }
     }
+    public function getAllNews()
+{
+    $news = SourceNews::select('id', 'title', 'content', 'img_url', 'source_id', 'category_id', 'created_at', 'updated_at')
+        ->orderByDesc('created_at')
+        ->get();
+
+    return response()->json($news);
+}
+
     }
 

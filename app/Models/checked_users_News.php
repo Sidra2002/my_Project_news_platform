@@ -8,9 +8,9 @@ class checked_users_News extends Model
 {
     //
     protected $fillable = [
-        'title',
-        'content',
+       'content',
         'user_id',
+        'is_fake',
     ];
 
     // Relationships
