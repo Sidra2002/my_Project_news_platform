@@ -109,38 +109,46 @@ class SourceNewsController extends Controller
 
 
     private function detectCategory($text)
-    {
-        if (self::$classificationKeywords === null) {
-            self::$classificationKeywords = $this->loadClassificationKeywords();
-        }
+{
+    if (self::$classificationKeywords === null) {
+        self::$classificationKeywords = $this->loadClassificationKeywords();
+    }
 
-        $keywordsMapping = self::$classificationKeywords;
+    $keywordsMapping = self::$classificationKeywords;
 
-        if (!is_array($keywordsMapping)) {
-            Log::warning("🚨 ملف التصنيف غير صالح أو فارغ، سيتم استخدام التصنيف العام.");
-            return $this->defaultCategoryId;
-        }
-
-        $matchedCategoryName = null;
-
-        foreach ($keywordsMapping as $categoryName => $keywords) {
-            foreach ($keywords as $keyword) {
-                if (mb_stripos($text, $keyword) !== false) {
-                    $matchedCategoryName = $categoryName;
-                    break 2;
-                }
-            }
-        }
-
-        if ($matchedCategoryName) {
-            $category = Category::where('name', $matchedCategoryName)->first();
-            if ($category) {
-                return $category->id;
-            }
-        }
-
+    if (!is_array($keywordsMapping)) {
+        Log::warning("🚨 ملف التصنيف غير صالح أو فارغ، سيتم استخدام التصنيف العام.");
         return $this->defaultCategoryId;
     }
+
+    $categoryScores = [];
+    foreach ($keywordsMapping as $categoryName => $keywords) {
+        $score = 0;
+        foreach ($keywords as $keyword) {
+            if (mb_stripos($text, $keyword) !== false) {
+                $score++;
+            }
+        }
+
+        // نضع شرط العتبة
+        if ($score >= 2) {
+            $categoryScores[$categoryName] = $score;
+        }
+    }
+
+    if (!empty($categoryScores)) {
+        arsort($categoryScores);
+        $topCategoryName = array_key_first($categoryScores);
+        $category = Category::where('name', $topCategoryName)->first();
+        if ($category) {
+            return $category->id;
+        }
+    }
+
+    // في حال لم يتم الكشف
+    return $this->defaultCategoryId;
+}
+
 
     private function loadClassificationKeywords()
     {
@@ -160,11 +168,12 @@ class SourceNewsController extends Controller
                 return null;
             }
 
-            Log::info("📁 تم تحميل ملف التصنيف بنجاح.");
+            Log::info("\ud83d\udcc1 تم تحميل ملف التصنيف بنجاح.");
             return $data;
         } catch (\Exception $e) {
             Log::error("❌ فشل في قراءة ملف التصنيف", ['error' => $e->getMessage()]);
             return null;
         }
     }
-}
+    }
+

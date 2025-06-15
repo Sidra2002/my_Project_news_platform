@@ -15,12 +15,12 @@ return new class extends Migration
         $table->id();
         $table->unsignedBigInteger('user_id');
         $table->unsignedBigInteger('news_id');
-        $table->enum('reaction_type', ['like', 'dislike']);
+        $table->tinyInteger('reaction_type');
         $table->timestamps();
 
         // علاقات
         $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-        $table->foreign('news_id')->references('id')->on('sourcenews')->onDelete('cascade');
+        $table->foreign('news_id')->references('id')->on('source_news')->onDelete('cascade');
 
         // منع التكرار
         $table->unique(['user_id', 'news_id']);

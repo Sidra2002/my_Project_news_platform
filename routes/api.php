@@ -8,6 +8,7 @@ use App\Http\Controllers\SourceNewsController;
 use App\Http\Controllers\NewsReactionController;
 use App\Http\Controllers\UserRecomandationsController;
 use App\Http\Controllers\UserProfileController;
+use App\Http\Controllers\SearchController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -45,3 +46,7 @@ Route::middleware('auth:sanctum')->get('/user/profile', [\App\Http\Controllers\U
 
 //Edite personal info
 Route::middleware('auth:sanctum')->put('/user/profile', [\App\Http\Controllers\UserProfileController::class, 'update']);
+
+//search
+Route::get('/search/category/{category}', [SearchController::class, 'filterByCategory']);
+

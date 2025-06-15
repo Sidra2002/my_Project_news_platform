@@ -14,7 +14,7 @@ class NewsReactionController extends Controller
         ]);
 
         $userId = Auth::id();
-        $reactionType = $request->reaction;
+        $reactionType = $request->reaction === 'like' ? 1 : -1;
 
         $existing = NewsReaction::where('user_id', $userId)
                                 ->where('news_id', $newsId)
@@ -22,17 +22,14 @@ class NewsReactionController extends Controller
 
         if ($existing) {
             if ($existing->reaction_type === $reactionType) {
-                // إلغاء التفاعل
                 $existing->delete();
                 return response()->json(['message' => 'Reaction removed']);
             } else {
-                // تغيير نوع التفاعل
                 $existing->reaction_type = $reactionType;
                 $existing->save();
                 return response()->json(['message' => 'Reaction updated']);
             }
         } else {
-            // إنشاء تفاعل جديد
             NewsReaction::create([
                 'user_id' => $userId,
                 'news_id' => $newsId,
