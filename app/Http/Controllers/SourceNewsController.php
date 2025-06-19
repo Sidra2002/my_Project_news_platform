@@ -34,8 +34,9 @@ class SourceNewsController extends Controller
                 }
 
                 foreach ($rss->channel->item as $item) {
-                    $title = (string) $item->title;
-                    $description = (string) $item->description;
+                    $title = $this->cleanText((string) $item->title);
+                    $description = $this->cleanText((string) $item->description);
+
                     echo "  start  ";
                     try {
                         $content = $item->children('http://purl.org/rss/1.0/modules/content/')->encoded;
@@ -87,8 +88,8 @@ class SourceNewsController extends Controller
                         echo $imageFileName;
                         SourceNews::create([
                             'title' => $title,
-                            'content' => strip_tags($description),
-                            'category_id' => $categoryId,
+                            'content' => $description, // لأنه أصبح نظيفاً سابقاً
+                           'category_id' => $categoryId,
                             'source_id' => $source->id,
                             'img_url' => $imageFileName,
                             'created_at' => $publishedAt,
@@ -107,8 +108,7 @@ class SourceNewsController extends Controller
     }
 
 
-
-    private function detectCategory($text)
+private function detectCategory($text)
 {
     if (self::$classificationKeywords === null) {
         self::$classificationKeywords = $this->loadClassificationKeywords();
@@ -149,8 +149,7 @@ class SourceNewsController extends Controller
     return $this->defaultCategoryId;
 }
 
-
-    private function loadClassificationKeywords()
+private function loadClassificationKeywords()
     {
         $filePath = storage_path('app/classification_keyword.json');
 
@@ -184,5 +183,23 @@ class SourceNewsController extends Controller
     return response()->json($news);
 }
 
-    }
+
+private function cleanText($text)
+{
+    // 1. إزالة التاغات HTML
+    $text = strip_tags($text);
+
+    // 2. إزالة أي شيء غير الحروف العربية أو المسافات
+    $text = preg_replace('/[^\p{Arabic}\s]/u', '', $text);
+
+    // 3. إزالة المسافات المتكررة
+    $text = preg_replace('/\s+/', ' ', $text);
+
+    // 4. تقليم الفراغات من البداية والنهاية
+    return trim($text);
+}
+
+
+}
+
 
